@@ -113,7 +113,7 @@ async function updatePresence() {
     largeImageText: "Listening on Last.fm",
     largeImageKey: "lastfm",
     smallImageText: `Listening as ${username}`,
-    smallImageKey: "music",
+    smallImageKey: "music2",
     instance: false,
   };
 
@@ -141,24 +141,24 @@ rpc.on("ready", async () => {
   setInterval(updatePresence, fetchInterval);
 
   eep = false;
+});
 
-  rpc.on("disconnected", () => {
-    console.warn("Discord RPC disconnected. Attempting to reconnect...");
-  });
+rpc.on("disconnected", () => {
+  console.warn("Discord RPC disconnected. Attempting to reconnect...");
+});
 
-  rpc.on("error", (error) => {
-    if (!eep) console.error("Discord RPC error:", error);
-    eep = true;
-  });
+rpc.on("error", (error) => {
+  if (!eep) console.error("Discord RPC error:", error);
+  eep = true;
+});
 
-  rpc.on("close", () => {
-    console.warn("Discord RPC connection closed. Attempting to reconnect...");
-  });
+rpc.on("close", () => {
+  console.warn("Discord RPC connection closed. Attempting to reconnect...");
+});
 
-  rpc.on("debug", (message) => {
-    // Uncomment the next line to enable debug logging
-    // console.debug("Discord RPC debug:", message);
-  });
+rpc.on("debug", (message) => {
+  // Uncomment the next line to enable debug logging
+  // console.debug("Discord RPC debug:", message);
 });
 
 let eep = false;
@@ -166,6 +166,7 @@ let eep = false;
 while (true) {
   try {
     await rpc.login();
+    await new Promise<void>((resolve) => rpc.once("disconnected", () => resolve()));
   } catch (error) {
     if (!eep) console.error("Error connecting to Discord RPC:", error);
     eep = true;
