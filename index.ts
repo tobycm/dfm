@@ -157,7 +157,6 @@ rpc.on("close", () => {
 });
 
 rpc.on("debug", (message) => {
-  // Uncomment the next line to enable debug logging
   // console.debug("Discord RPC debug:", message);
 });
 
