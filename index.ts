@@ -59,6 +59,8 @@ async function fetchUserAvatar() {
 }
 
 async function updatePresence() {
+  let data: NowPlayingResponse | undefined;
+
   try {
     const response = await fetch(getNowPlayingUrl(username!));
 
@@ -69,50 +71,57 @@ async function updatePresence() {
       lastTrackHash = undefined;
       return;
     }
-    const data = (await response.json()) as NowPlayingResponse;
+    data = (await response.json()) as typeof data;
+  } catch (error) {
+    console.error("Error updating presence:", error);
 
-    const track = data?.recenttracks?.track?.[0];
+    rpc.user?.clearActivity();
+    lastTrackHash = undefined;
+    return;
+  }
 
-    const isNowPlaying = track && track["@attr"]?.nowplaying === "true";
+  const track = data?.recenttracks?.track?.[0];
 
-    if (!isNowPlaying || !track) {
-      if (lastTrackHash !== undefined) {
-        console.log("No track is currently playing. Clearing activity.");
-        rpc.user?.clearActivity();
-        lastTrackHash = undefined;
-      }
-      return;
+  const isNowPlaying = track && track["@attr"]?.nowplaying === "true";
+
+  if (!isNowPlaying || !track) {
+    if (lastTrackHash !== undefined) {
+      console.log("No track is currently playing. Clearing activity.");
+      rpc.user?.clearActivity();
+      lastTrackHash = undefined;
     }
+    return;
+  }
 
-    const { name: trackName, artist, album } = track;
-    const artistName = artist["#text"];
-    const albumName = album["#text"];
+  const { name: trackName, artist, album } = track;
+  const artistName = artist["#text"];
+  const albumName = album["#text"];
 
-    const trackHash = `${artistName}-${trackName}-${albumName}`;
-    if (trackHash === lastTrackHash) {
-      return;
-    }
-    lastTrackHash = trackHash;
+  const trackHash = `${artistName}-${trackName}-${albumName}`;
+  if (trackHash === lastTrackHash) {
+    return;
+  }
+  lastTrackHash = trackHash;
 
-    console.log(`Now playing: ${artistName} - ${trackName}`);
+  console.log(`Now playing: ${artistName} - ${trackName}`);
 
-    const activity: SetActivity = {
-      details: trackName,
-      state: `by ${artistName}`,
-      type: 2,
-      startTimestamp: new Date(),
-      largeImageKey: "lastfm_logo",
-      largeImageText: "",
-      smallImageKey: "user_avatar",
-      smallImageText: `Listening as ${username}`,
-      // smallImageUrl: userAvatarUrl,
-      instance: false,
-    };
+  const activity: SetActivity = {
+    details: trackName,
+    state: `by ${artistName}`,
+    type: 2,
+    startTimestamp: new Date(),
+    largeImageText: "Listening on Last.fm",
+    largeImageKey: "lastfm",
+    smallImageText: `Listening as ${username}`,
+    smallImageKey: "music",
+    instance: false,
+  };
 
-    if (albumName) {
-      activity.largeImageText = `on ${albumName}`;
-    }
+  if (albumName) {
+    activity.largeImageText = `on ${albumName}`;
+  }
 
+  try {
     rpc.user?.setActivity(activity);
   } catch (error) {
     console.error("Error updating presence:", error);
@@ -126,10 +135,39 @@ rpc.on("ready", async () => {
   console.log(`Discord RPC connected. Authenticated as ${rpc.user?.username}.`);
   console.log(`Starting Last.fm presence for user: ${username}`);
 
-  await fetchUserAvatar();
+  // await fetchUserAvatar();
 
   updatePresence();
   setInterval(updatePresence, fetchInterval);
+
+  eep = false;
+
+  rpc.on("disconnected", () => {
+    console.warn("Discord RPC disconnected. Attempting to reconnect...");
+  });
+
+  rpc.on("error", (error) => {
+    if (!eep) console.error("Discord RPC error:", error);
+    eep = true;
+  });
+
+  rpc.on("close", () => {
+    console.warn("Discord RPC connection closed. Attempting to reconnect...");
+  });
+
+  rpc.on("debug", (message) => {
+    // Uncomment the next line to enable debug logging
+    // console.debug("Discord RPC debug:", message);
+  });
 });
 
-rpc.login();
+let eep = false;
+
+while (true) {
+  try {
+    await rpc.login();
+  } catch (error) {
+    if (!eep) console.error("Error connecting to Discord RPC:", error);
+    eep = true;
+  }
+}
