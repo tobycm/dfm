@@ -45,7 +45,7 @@ function getNowPlayingUrl(user: string): string {
 
 async function getItunesArtwork(artist: string, track: string) {
   try {
-    const query = encodeURIComponent(`${artist} ${track}`);
+    const query = encodeURIComponent(`${artist} - ${track}`);
     const res = await fetch(`https://itunes.apple.com/search?term=${query}&media=music&entity=song&limit=1`);
     const data = (await res.json()) as { resultCount: number; results: { artworkUrl100: string }[] };
 
@@ -180,5 +180,6 @@ while (true) {
   } catch (error) {
     if (!eep) console.error("Error connecting to Discord RPC:", error);
     eep = true;
+    await new Promise((resolve) => setTimeout(resolve, 5000));
   }
 }
