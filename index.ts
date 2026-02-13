@@ -1,4 +1,8 @@
+import { parseArgs } from "util";
+
 import { Client, type SetActivity } from "@xhayper/discord-rpc";
+
+import YouTube from "youtube-sr";
 
 const clientId = "1416673171339350138";
 const apiKey = "4fe5ea349553b84027c2b0d1c950a41f";
@@ -16,7 +20,15 @@ interface NowPlayingResponse {
   };
 }
 
-const username = process.argv[2];
+const args = parseArgs({
+  args: process.argv,
+  options: {
+    username: { type: "string", short: "u" },
+  },
+  allowPositionals: true,
+});
+
+const username = args.values.username;
 if (!username) {
   console.error("Please provide a Last.fm username as a command-line argument.");
   process.exit(1);
@@ -31,30 +43,18 @@ function getNowPlayingUrl(user: string): string {
   return `https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${user}&api_key=${apiKey}&limit=1&format=json`;
 }
 
-function getUserAvatarUrl(user: string): string {
-  return `http://ws.audioscrobbler.com/2.0/?method=user.getinfo&user=${user}&api_key=${apiKey}&format=json`;
-}
-
-let userAvatarUrl: string | undefined;
-
-async function fetchUserAvatar() {
+async function getItunesArtwork(artist: string, track: string) {
   try {
-    const response = await fetch(getUserAvatarUrl(username!));
-    if (!response.ok) {
-      console.error(`Error fetching user info from Last.fm: ${response.statusText}`);
-      return;
-    }
+    const query = encodeURIComponent(`${artist} ${track}`);
+    const res = await fetch(`https://itunes.apple.com/search?term=${query}&media=music&entity=song&limit=1`);
+    const data = (await res.json()) as { resultCount: number; results: { artworkUrl100: string }[] };
 
-    const data = await response.json();
-    userAvatarUrl = data?.user?.image?.[3]["#text"];
-
-    if (!userAvatarUrl) {
-      console.warn("No avatar URL found for user.");
-      return;
+    if (data.resultCount > 0) {
+      // iTunes returns a 100x100 url, but we can hack it to get high-res
+      return data.results[0]?.artworkUrl100.replace("100x100bb", "1000x1000bb");
     }
-    console.log(`Fetched user avatar URL: ${userAvatarUrl}`);
-  } catch (error) {
-    console.error("Error fetching user avatar:", error);
+  } catch (e) {
+    return null;
   }
 }
 
@@ -105,15 +105,26 @@ async function updatePresence() {
 
   console.log(`Now playing: ${artistName} - ${trackName}`);
 
+  let albumArt = await getItunesArtwork(artistName, trackName);
+
+  if (!albumArt) {
+    try {
+      const results = await YouTube.searchOne(`${artistName} - ${trackName}`, "video");
+      albumArt = results.thumbnail?.url;
+    } catch (error) {
+      console.error("Error fetching album art from YouTube:", error);
+    }
+  }
+
   const activity: SetActivity = {
     details: trackName,
     state: `by ${artistName}`,
     type: 2,
     startTimestamp: new Date(),
     largeImageText: "Listening on Last.fm",
-    largeImageKey: "lastfm",
+    largeImageKey: albumArt || "lastfm",
     smallImageText: `Listening as ${username}`,
-    smallImageKey: "music2",
+    smallImageKey: "https://emoji.slack-edge.com/T09V59WQY1E/edm/4297d1ba1b50c05b.gif",
     instance: false,
   };
 
