@@ -11,7 +11,7 @@ Download the latest release from the [releases page](https://github.com/tobycm/d
 Run the executable in your terminal:
 
 ```sh
-dfm.exe <lastfm_username>
+dfm.exe -u <lastfm_username>
 ```
 
 where `<lastfm_username>` is your last.fm username
@@ -19,7 +19,7 @@ where `<lastfm_username>` is your last.fm username
 Example:
 
 ```sh
-dfm tobycm2
+dfm -u tobycm2
 ```
 
 ## Tech Stack
